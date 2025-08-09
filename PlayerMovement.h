@@ -250,7 +250,7 @@ public:
                     int localX = px - x;
                     int localY = py - y;
 
-                    // Check sprite pixel alpha (you need a function for this)
+                    // Check sprite pixel alpha 
                     if (sprite->isSolid(localX, localY) > 0)
                     {
                         // Solid pixel collision: immediate collision
