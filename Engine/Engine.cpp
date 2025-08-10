@@ -24,24 +24,66 @@ void Engine::renderPixel(int x, int y, const RGBA &color)
 
 void Engine::prepareFrameString()
 {
-    std::ostringstream oss;
-    oss << "\x1b[H"; // Move cursor to top
+    // Reserve space for full frame string (avoid reallocations)
+    std::string &frame = frameStrings[currentBuffer];
+    frame.clear();
+    frame.reserve(width * height * estimatedCharsPerFrame);
+
+    // Move cursor to top
+    frame.append("\x1b[H");
 
     auto &buf = buffers[currentBuffer];
+
+    // Track current colors to avoid redundant ANSI codes
+    int lastFgR = -1, lastFgG = -1, lastFgB = -1;
+    int lastBgR = -1, lastBgG = -1, lastBgB = -1;
+
     for (int y = 0; y < height; y += 2)
     {
         for (int x = 0; x < width; ++x)
         {
-            RGBA top = buf[y][x];
-            RGBA bottom = (y + 1 < height) ? buf[y + 1][x] : RGBA{0, 0, 0, 0};
+            const RGBA &top = buf[y][x];
+            const RGBA &bottom = (y + 1 < height) ? buf[y + 1][x] : RGBA{0, 0, 0, 0};
 
-            oss << "\x1b[38;2;" << (int)top.r << ";" << (int)top.g << ";" << (int)top.b << "m";
-            oss << "\x1b[48;2;" << (int)bottom.r << ";" << (int)bottom.g << ";" << (int)bottom.b << "m";
-            oss << "▀";
+            // Foreground (top half)
+            if (top.r != lastFgR || top.g != lastFgG || top.b != lastFgB)
+            {
+                frame.append("\x1b[38;2;");
+                frame.append(std::to_string(top.r));
+                frame.push_back(';');
+                frame.append(std::to_string(top.g));
+                frame.push_back(';');
+                frame.append(std::to_string(top.b));
+                frame.push_back('m');
+                lastFgR = top.r;
+                lastFgG = top.g;
+                lastFgB = top.b;
+            }
+
+            // Background (bottom half)
+            if (bottom.r != lastBgR || bottom.g != lastBgG || bottom.b != lastBgB)
+            {
+                frame.append("\x1b[48;2;");
+                frame.append(std::to_string(bottom.r));
+                frame.push_back(';');
+                frame.append(std::to_string(bottom.g));
+                frame.push_back(';');
+                frame.append(std::to_string(bottom.b));
+                frame.push_back('m');
+                lastBgR = bottom.r;
+                lastBgG = bottom.g;
+                lastBgB = bottom.b;
+            }
+
+            // Pixel block
+            frame.append(u8"▀");
         }
-        oss << "\x1b[0m\n";
+
+        // Reset colors & new line
+        frame.append("\x1b[0m\n");
+        lastFgR = lastFgG = lastFgB = -1;
+        lastBgR = lastBgG = lastBgB = -1;
     }
-    frameStrings[currentBuffer] = oss.str();
 }
 
 void Engine::swapBuffers()
@@ -111,5 +153,10 @@ void Engine::renderScene(const WorldRenderData &data)
 
 void Engine::draw()
 {
-    std::cout << frameStrings[1 - currentBuffer] << std::flush;
+    DWORD written;
+    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),
+              frameStrings[1 - currentBuffer].c_str(),
+              (DWORD)frameStrings[1 - currentBuffer].size(),
+              &written,
+              NULL);
 }

@@ -61,15 +61,20 @@ public:
 
         if (inputVelocity.x != 0 && inputVelocity.y != 0)
         {
-            float invLen = 1.0f / std::sqrt(inputVelocity.x * inputVelocity.x + inputVelocity.y * inputVelocity.y);
+            float invLen = std::ceil(1.0f / std::sqrt(inputVelocity.x * inputVelocity.x + inputVelocity.y * inputVelocity.y));
             inputVelocity.x *= invLen;
             inputVelocity.y *= invLen;
+            // 
+
+
+            Debug::Log("Diagonal movement detected, normalizing input velocity "+ std::to_string(inputVelocity.x) + ", " + std::to_string(inputVelocity.y));
         }
 
         float speed = 3.0f;
         entity->velocity = inputVelocity * speed;
 
-        Vec2 moveAmount = entity->velocity * dt * 30;
+        Vec2 moveAmount = entity->velocity *std::ceil( dt * 30);
+
 
         int steps = static_cast<int>(std::ceil(std::max(std::abs(moveAmount.x), std::abs(moveAmount.y))));
         if (steps == 0)
