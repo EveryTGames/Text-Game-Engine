@@ -67,10 +67,9 @@ public:
             // 
 
 
-            Debug::Log("Diagonal movement detected, normalizing input velocity "+ std::to_string(inputVelocity.x) + ", " + std::to_string(inputVelocity.y));
         }
 
-        float speed = 3.0f;
+        float speed = 1.0f;
         entity->velocity = inputVelocity * speed;
 
         Vec2 moveAmount = entity->velocity *std::ceil( dt * 30);

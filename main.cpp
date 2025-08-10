@@ -102,7 +102,7 @@ int main()
     // world.camera.followTarget(player);
 
     // ==== Game loop ====
-    const int targetFPS = 140;
+    const int targetFPS = 60;
     
     const auto frameDelay = std::chrono::milliseconds(1000 / targetFPS);
 
