@@ -129,5 +129,6 @@
     "codecvt": "cpp",
     "forward_list": "cpp",
     "unordered_set": "cpp"
-  }
+  },
+  "C_Cpp.default.compilerPath": "C:/msys64/ucrt64/bin/gcc.exe"
 }

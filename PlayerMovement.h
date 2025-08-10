@@ -32,7 +32,7 @@ public:
         // This assumes the world instance is set before PlayerMovement is used
         world = &World::GetInstance();
 
-        Debug::Log("PlayerMovement script started");
+        // Debug::Log("PlayerMovement script started");
     }
 
     inline int roundToInt(float val)
@@ -45,9 +45,9 @@ public:
 
         auto map = entity->getMap();
         auto &sprite = entity->sprite;
-         world->camera.position = entity->position - Vec2{world->camera.getWidth() / 2, world->camera.getHeight() / 2}; // Center camera on player
-         Debug::Log("Camera position: " + std::to_string(world->camera.position.x) + ", " + std::to_string(world->camera.position.y));
-          Debug::Log("camera width and height: " + std::to_string(world->camera.getWidth() / 2) + ", " + std::to_string(world->camera.getHeight() / 2));
+        world->camera.position = entity->position - Vec2{world->camera.getWidth() / 2, world->camera.getHeight() / 2}; // Center camera on player
+                                                                                                                       //  Debug::Log("Camera position: " + std::to_string(world->camera.position.x) + ", " + std::to_string(world->camera.position.y));
+                                                                                                                       //   Debug::Log("camera width and height: " + std::to_string(world->camera.getWidth() / 2) + ", " + std::to_string(world->camera.getHeight() / 2));
         Vec2float inputVelocity{0.0f, 0.0f};
 
         if (GetAsyncKeyState('W') & 0x8000)
@@ -125,7 +125,7 @@ public:
             {
                 entity->position.x = nextPosX.x;
                 collisionFlags = filteredFlagsX;
-                collisionFlags.insert(collisionFlags.end(), newFlagsX.begin(), newFlagsX.end());
+                addFlagsNoDuplicates(newFlagsX);
                 movedX = true;
             }
 
@@ -173,7 +173,7 @@ public:
             {
                 entity->position.y = nextPosY.y;
                 collisionFlags = filteredFlagsY;
-                collisionFlags.insert(collisionFlags.end(), newFlagsY.begin(), newFlagsY.end());
+                addFlagsNoDuplicates(newFlagsY);
                 movedY = true;
             }
 
@@ -183,6 +183,9 @@ public:
                 break;
             }
         }
+
+        // debug the count of the flags
+       // Debug::Log("Collision flags count: " + std::to_string(collisionFlags.size()));
 
         // Cleanup flags outside bounding box
         collisionFlags.erase(
@@ -250,7 +253,7 @@ public:
                     int localX = px - x;
                     int localY = py - y;
 
-                    // Check sprite pixel alpha 
+                    // Check sprite pixel alpha
                     if (sprite->isSolid(localX, localY) > 0)
                     {
                         // Solid pixel collision: immediate collision
@@ -267,5 +270,24 @@ public:
         }
 
         return collisionFound;
+    }
+
+private:
+    void addFlagsNoDuplicates(const std::vector<CollisionFlag> &newFlags)
+    {
+        for (const CollisionFlag &flag : newFlags)
+        {
+            bool found = false;
+            for (const CollisionFlag &existingFlag : collisionFlags)
+            {
+                if (existingFlag.x == flag.x && existingFlag.y == flag.y)
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                collisionFlags.push_back(flag);
+        }
     }
 };

@@ -83,16 +83,13 @@ int main()
     Engine engine(width, height);
 
     auto world = std::make_unique<World>();
-       // Load map
+    // Load map
     Map gameMap("level1.png");
     world->setMap(gameMap);
 
     World::SetInstance(world.get()); // Set self-reference for scripts
 
     world->camera.setSize(width, height);
-    
-
- 
 
     // Load player
     auto playerSprite = std::make_shared<Sprite>("player.png", 5, 5);
@@ -105,8 +102,11 @@ int main()
     // world.camera.followTarget(player);
 
     // ==== Game loop ====
-    const int targetFPS = 30;
+    const int targetFPS = 40;
     const auto frameDelay = std::chrono::milliseconds(1000 / targetFPS);
+
+    int frameCount = 0;
+    auto startTime = std::chrono::high_resolution_clock::now();
 
     while (true)
     {
@@ -132,6 +132,21 @@ int main()
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(frameEnd - frameStart);
         if (elapsed < frameDelay)
             std::this_thread::sleep_for(frameDelay - elapsed);
+
+        frameCount++;
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> elapsedTime = currentTime - startTime;
+
+        if (elapsedTime.count() >= 1.0f)
+        {
+            float fps = frameCount / elapsedTime.count();
+            Debug::Log("FPS: " + std::to_string(fps));
+
+            // Reset for the next second
+            frameCount = 0;
+            startTime = currentTime;
+        }
     }
 
     return 0;
