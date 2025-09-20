@@ -5,6 +5,8 @@
 #include "Sprite/Sprite.h"
 #include "Utils/Utils.h"
 #include "PlayerMovement.h"
+#include "../SpriteRotation/SpriteRotationBehavior.h"
+#include "../Behaviores/BehaviorManager.h"
 
 void enableANSI()
 {
@@ -18,28 +20,83 @@ void enableANSI()
     SetConsoleMode(hOut, dwMode);
 }
 
-void setFullscreen()
+HWND waitForConsole()
 {
-    HWND console = GetConsoleWindow();
-    ShowWindow(console, SW_MAXIMIZE);
+    HWND hwnd = nullptr;
+    HWND owner = nullptr;
+    for (int i = 0; i < 200; ++i) // try longer if needed 
+    {
+           
+
+        hwnd = GetConsoleWindow();
+        if (hwnd != nullptr)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            
+            owner = GetWindow(hwnd, GW_OWNER);         // for Windows 11
+            if (hwnd != nullptr || (owner == nullptr)) // Windows 10 or 11
+            {
+
+                break;
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    return hwnd;
+}
+// ==== Make the console window fullscreen (window only, no borders) ====
+void setFullscreenWindowOnly()
+{
+    HWND hwnd = waitForConsole();
+    if (!hwnd)
+    {
+
+        return;
+    }
+
+    HWND target = hwnd;
+    HWND owner = GetWindow(hwnd, GW_OWNER);
+    if (owner != nullptr)
+        target = owner;
+
+    // Remove decorations
+    LONG style = GetWindowLong(target, GWL_STYLE);
+    style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+    SetWindowLong(target, GWL_STYLE, style);
+
+    // Get monitor dimensions
+    MONITORINFO mi = {sizeof(mi)};
+    if (!GetMonitorInfo(MonitorFromWindow(target, MONITOR_DEFAULTTOPRIMARY), &mi))
+        return;
+
+    SetWindowPos(target, HWND_TOP,
+                 mi.rcMonitor.left,
+                 mi.rcMonitor.top,
+                 mi.rcMonitor.right - mi.rcMonitor.left,
+                 mi.rcMonitor.bottom - mi.rcMonitor.top,
+                 SWP_NOZORDER | SWP_FRAMECHANGED);
+
+    DrawMenuBar(target);
 }
 
-void fixConsoleSize()
+// ==== Set a fixed console grid for proper engine rendering ====
+void fixConsoleBufferSize(int cols, int rows)
 {
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    GetConsoleScreenBufferInfo(hOut, &csbi);
+    if (hOut == INVALID_HANDLE_VALUE)
+        return;
 
-    SHORT width = csbi.srWindow.Right - csbi.srWindow.Left + 1;
-    SHORT height = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    // Resize the buffer
+    COORD bufferSize = {static_cast<SHORT>(cols), static_cast<SHORT>(rows)};
+    SetConsoleScreenBufferSize(hOut, bufferSize);
 
-    SMALL_RECT win = {0, 0, static_cast<SHORT>(width - 1), static_cast<SHORT>(height - 1)};
-    SetConsoleWindowInfo(hOut, TRUE, &win);
-
-    COORD size = {width, height};
-    SetConsoleScreenBufferSize(hOut, size);
+    // Resize the window rectangle
+    SMALL_RECT windowSize = {0, 0, static_cast<SHORT>(cols - 1), static_cast<SHORT>(rows - 1)};
+    SetConsoleWindowInfo(hOut, TRUE, &windowSize);
 }
 
+// ==== hide cursor ====
 void hideCursor()
 {
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -48,6 +105,8 @@ void hideCursor()
     cursorInfo.bVisible = false;
     SetConsoleCursorInfo(hOut, &cursorInfo);
 }
+
+// ==== get console grid size ====
 void getConsoleSize(int &width, int &height)
 {
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -57,18 +116,21 @@ void getConsoleSize(int &width, int &height)
     height = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
 }
 
-/// TODO: add the rest of the Engine functnailities
-/// TODO: add the map world things
-/// TODO: map horizontal scrolling
-/// TODO: Add error handling for sprite loading
-/// TODO: Add sprite bounds checking
-/// TODO: Add sprite animation
-/// TODO: Add sprite rotation
+/// TODO: Add the behaviour for sprite animation
+/// TODO: make the collistion system a behavoure and call it in the player movement normally, or even in the physics 
+/// TODO: add the behaviour for physics or maybe not a behavoure since i willl need to call it every certain frames, or maybe a behavoiuor and make it controlled inside the main loop, but this will need to map al the entities that  has attached physics behaviour, depanding in the best practise 
+/// TODO: Add ui system 
+/// TODO: Add multy windows(cmds) system for displaying texts (with wrapping option or maximum characters in one line and these text stuff)
+/// TODO: add the behaviour of platforms
+
+
 int main()
 {
-    // ==== Console setup ====
-    setFullscreen();
-    fixConsoleSize();
+    Sleep(50);
+
+   
+    //  ==== Console setup ====
+    setFullscreenWindowOnly();
     SetConsoleOutputCP(CP_UTF8);
     enableANSI();
     hideCursor();
@@ -77,7 +139,8 @@ int main()
     Debug::Log("Console setup complete");
     int width, height;
     getConsoleSize(width, height);
-    height = height * 2 - 2; // Adjust for double-height rendering
+    fixConsoleBufferSize(width, height);
+    height = height * 2 - 2 ; // Adjust for double-height rendering
 
     // ==== Engine + Game World ====
     Engine engine(width, height);
@@ -92,9 +155,15 @@ int main()
     world->camera.setSize(width, height);
 
     // Load player
-    auto playerSprite = std::make_shared<Sprite>("player.png", 5, 5);
-    auto player = std::make_shared<Entity>(Vec2{3, 5}, playerSprite);
+    auto playerSprite = Sprite::create("player.png", 5, 5);
+
+    
+    // Attach the rotation behavior
+    playerSprite->getBehaviorManager().addBehavior(std::make_shared<SpriteRotationBehavior>());
+
+    auto player = Entity::create(Vec2{3, 5}, playerSprite);
     // Add a movement script
+    
     player->addScript<PlayerMovement>();
     world->addEntity(player);
 
@@ -103,7 +172,7 @@ int main()
 
     // ==== Game loop ====
     const int targetFPS = 60;
-    
+
     const auto frameDelay = std::chrono::milliseconds(1000 / targetFPS);
 
     int frameCount = 0;

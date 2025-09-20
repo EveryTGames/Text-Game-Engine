@@ -2,7 +2,8 @@
 #pragma once
 #include <memory>
 
-class Entity; // Forward declaration
+class Entity; // Forward declare to break circular include
+
 
 class Script {
 public:

@@ -3,14 +3,12 @@
 #include <../ImageLoader/ImageLoader.h>
 #include "../Utils/PixelTypes.h"
 
-Sprite::Sprite(const std::string &imagePath, int maxW, int maxH)
-{
-    loadImage(imagePath, maxW, maxH);
-}
 
 void Sprite::loadImage(const std::string &path, int maxW, int maxH)
 {
-   ImageLoader::loadImage(path, pixels, width, height, maxW, maxH);
+    ImageLoader::loadImage(path, pixels, width, height, maxW, maxH);
+    
+    
 }
 
 int Sprite::getWidth() const { return width; }
@@ -23,11 +21,14 @@ RGBA Sprite::getPixel(int x, int y) const
     return {0, 0, 0}; // Return black if out of bounds
 }
 
-std::vector<std::vector<RGBA>> Sprite::getPartialPixels(int startX, int startY, int w, int h) const {
+std::vector<std::vector<RGBA>> Sprite::getPartialPixels(int startX, int startY, int w, int h) const
+{
     std::vector<std::vector<RGBA>> partial;
-    for (int y = startY; y < startY + h; ++y) {
+    for (int y = startY; y < startY + h; ++y)
+    {
         std::vector<RGBA> row;
-        for (int x = startX; x < startX + w; ++x) {
+        for (int x = startX; x < startX + w; ++x)
+        {
             row.push_back(getPixel(x, y));
         }
         partial.push_back(row);
@@ -35,12 +36,14 @@ std::vector<std::vector<RGBA>> Sprite::getPartialPixels(int startX, int startY, 
     return partial;
 }
 
-bool Sprite::isSolid(int x, int y) const {
+bool Sprite::isSolid(int x, int y) const
+{
     PixelType type = classifyPixelAlpha(getPixel(x, y).a);
     return type == PixelType::Solid;
 }
 
-bool Sprite::isTrigger(int x, int y) const {
+bool Sprite::isTrigger(int x, int y) const
+{
     PixelType type = classifyPixelAlpha(getPixel(x, y).a);
     return type == PixelType::Trigger;
 }

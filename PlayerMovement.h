@@ -7,6 +7,7 @@
 #include <cmath>
 #include <vector>
 #include <cmath> // for std::round
+#include "../SpriteRotation/SpriteRotationBehavior.h"
 
 struct CollisionFlag
 {
@@ -17,24 +18,49 @@ class PlayerMovement : public Script
 {
 
 public:
-    // Static function to get the single instance
-    static PlayerMovement &GetInstance()
-    {
-        static PlayerMovement instance; // Created once on first call
-        return instance;
-    }
+    PlayerMovement() {}
+
     World *world = nullptr;
+
+    const Map *map;
+    std::shared_ptr<Sprite> sprite;
+    std::shared_ptr<SpriteRotationBehavior> rot;
+    float angle;
 
     std::vector<CollisionFlag> collisionFlags; // store flags across frames
     void onStart() override
     {
-        // Initialize world reference
-        // This assumes the world instance is set before PlayerMovement is used
         world = &World::GetInstance();
+        if (!entity)
+        {
+            Debug::Log(" PlayerMovement: entity is null");
+            return;
+        }
 
-        // Debug::Log("PlayerMovement script started");
+        angle = 90;
+
+        map = entity->getMap();
+        if (!map)
+        {
+            Debug::Log(" PlayerMovement: map is null");
+        }
+
+        sprite = entity->sprite;
+        if (!sprite)
+        {
+            Debug::Log(" PlayerMovement: sprite is null");
+            return;
+        }
+        
+        rot = sprite->getBehavior<SpriteRotationBehavior>();
+        if (!rot)
+        {
+            Debug::Log(" PlayerMovement: rotation behavior is null");
+        }
+        ///TODO you will make the sprite rotation in a seperated default script that be attached automaticliiy to any sprits created 
+        rot->setInitialCache(sprite->getPixels());
+        Debug::Log(" PlayerMovement script started");
     }
-
     inline int roundToInt(float val)
     {
         return static_cast<int>(std::round(val));
@@ -43,8 +69,6 @@ public:
     void onUpdate(float dt) override
     {
 
-        auto map = entity->getMap();
-        auto &sprite = entity->sprite;
         world->camera.position = entity->position - Vec2{world->camera.getWidth() / 2, world->camera.getHeight() / 2}; // Center camera on player
                                                                                                                        //  Debug::Log("Camera position: " + std::to_string(world->camera.position.x) + ", " + std::to_string(world->camera.position.y));
                                                                                                                        //   Debug::Log("camera width and height: " + std::to_string(world->camera.getWidth() / 2) + ", " + std::to_string(world->camera.getHeight() / 2));
@@ -58,22 +82,40 @@ public:
             inputVelocity.x = -1;
         if (GetAsyncKeyState('D') & 0x8000)
             inputVelocity.x = 1;
+        if (GetAsyncKeyState('R') & 0x0001)
+        {
+
+            rot->rotate(270);
+        }
+         if (GetAsyncKeyState('T') & 0x0001)
+        {
+
+            rot->rotate(0);
+        }
+         if (GetAsyncKeyState('Y') & 0x0001)
+        {   
+            ///TODO
+            //i figured it out
+            // the problem is that when rotating it be rotating the new rotated spirit, so the angle be reset every rotation 
+            // to fix it u can make a variable that hold the main spirit or u can just use the cach variable to store the main spirit when created at index 0 
+            //and instead of sednig the new spirit to the rotating function, we send the cached one at index zero 
+
+            rot->rotate(angle+=22.5);
+        }
+
 
         if (inputVelocity.x != 0 && inputVelocity.y != 0)
         {
             float invLen = std::ceil(1.0f / std::sqrt(inputVelocity.x * inputVelocity.x + inputVelocity.y * inputVelocity.y));
             inputVelocity.x *= invLen;
             inputVelocity.y *= invLen;
-            // 
-
-
+            //
         }
 
         float speed = 1.0f;
         entity->velocity = inputVelocity * speed;
 
-        Vec2 moveAmount = entity->velocity *std::ceil( dt * 30);
-
+        Vec2 moveAmount = entity->velocity * std::ceil(dt * 30);
 
         int steps = static_cast<int>(std::ceil(std::max(std::abs(moveAmount.x), std::abs(moveAmount.y))));
         if (steps == 0)
@@ -189,7 +231,7 @@ public:
         }
 
         // debug the count of the flags
-       // Debug::Log("Collision flags count: " + std::to_string(collisionFlags.size()));
+        // Debug::Log("Collision flags count: " + std::to_string(collisionFlags.size()));
 
         // Cleanup flags outside bounding box
         collisionFlags.erase(

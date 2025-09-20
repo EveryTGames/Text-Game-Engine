@@ -6,17 +6,29 @@
 #include "../Utils/RenderResult.h"
 #include "../Sprite/Sprite.h"
 #include "../Utils/Utils.h"
+#include "../World/World.h"
 #include "../Script.h"
+#include "../Behaviores/BehaviorAttachableBase.h"
 
-class Entity
+class Entity : public BehaviorAttachableBase<Entity>
 {
-public:
+    
+    DECLARE_BEHAVIOR_ATTACHABLE(Entity,
+        (Vec2 pos, std::shared_ptr<Sprite> spr),
+         {
+            position = pos;
+            sprite = spr;
+            world = &World::GetInstance();
+        }
+    )
+
+    public:
     Vec2 position;
     Vec2float velocity;
     std::shared_ptr<Sprite> sprite;
+    World *world;
 
-    Entity(Vec2 pos, std::shared_ptr<Sprite> spr)
-        : position(pos), sprite(spr) {}
+
 
     void update(float dt);
     RenderResult getRenderData(const Camera &cam) const;
@@ -25,10 +37,7 @@ public:
     int getWidth() const { return sprite ? sprite->getWidth() : 0; }
     int getHeight() const { return sprite ? sprite->getHeight() : 0; }
 
-    class World *world = nullptr; // Forward declare World
-
     const Map *getMap() const; // Implementation will just call world->getMap()
-    
 
     /// TODO: understand this better
     // Add script
@@ -37,10 +46,25 @@ public:
     {
         static_assert(std::is_base_of<Script, T>::value, "T must inherit from Script");
         auto script = std::make_shared<T>(std::forward<Args>(args)...);
-        script->entity = std::shared_ptr<Entity>(this, [](Entity *) {}); // non-owning
+        script->entity = shared_from_this(); // correct shared_ptr
         scripts.push_back(script);
         script->onStart();
         return script;
+    }
+
+    template <typename T>
+    std::shared_ptr<T> getScript()
+    {
+        static_assert(std::is_base_of<Script, T>::value, "T must inherit from Script");
+
+        for (auto &script : scripts)
+        {
+            auto casted = std::dynamic_pointer_cast<T>(script);
+            if (casted)
+                return casted;
+        }
+
+        return nullptr; // Not found
     }
 
     void updateScripts(float dt)

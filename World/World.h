@@ -1,7 +1,6 @@
 #pragma once
 #include "../Map/Map.h"
 #include "../Camera/Camera.h"
-#include "../Entity/Entity.h"
 #include "../World/World.h"
 #include <vector>
 #include <memory>
@@ -12,6 +11,8 @@ struct WorldRenderData
     RenderResult mapRender;                  // The visible section of the map
     std::vector<RenderResult> entityRenders; // All visible entities
 };
+
+class Entity; // Forward declare to break circular include
 
 class World
 {
@@ -31,12 +32,7 @@ public:
     // To set the singleton world instance once
     static void SetInstance(World *world);
     // Add an entity to the world
-    void addEntity(const std::shared_ptr<Entity> &entity)
-    {
-        entity->world = this;
-        entities.push_back(entity);
-    }
-
+    void addEntity(const std::shared_ptr<Entity> &entity);
     // Remove entity by pointer
     void removeEntity(std::shared_ptr<Entity> entity)
     {

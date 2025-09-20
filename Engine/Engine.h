@@ -3,7 +3,7 @@
 #include <string>
 #include <sstream>
 #include <cstdint>
-#include <../Sprite/Sprite.h>
+#include "../Sprite/Sprite.h"
 #include "../Entity/Entity.h"
 #include "../World/World.h"
 #include "../ImageLoader/ImageLoader.h"
