@@ -24,15 +24,14 @@ HWND waitForConsole()
 {
     HWND hwnd = nullptr;
     HWND owner = nullptr;
-    for (int i = 0; i < 200; ++i) // try longer if needed 
+    for (int i = 0; i < 200; ++i) // try longer if needed
     {
-           
 
         hwnd = GetConsoleWindow();
         if (hwnd != nullptr)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            
+
             owner = GetWindow(hwnd, GW_OWNER);         // for Windows 11
             if (hwnd != nullptr || (owner == nullptr)) // Windows 10 or 11
             {
@@ -51,7 +50,6 @@ void setFullscreenWindowOnly()
     HWND hwnd = waitForConsole();
     if (!hwnd)
     {
-
         return;
     }
 
@@ -60,10 +58,14 @@ void setFullscreenWindowOnly()
     if (owner != nullptr)
         target = owner;
 
-    // Remove decorations
+    // Remove decorations and extended styles for borderless window
     LONG style = GetWindowLong(target, GWL_STYLE);
     style &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
     SetWindowLong(target, GWL_STYLE, style);
+
+    LONG exStyle = GetWindowLong(target, GWL_EXSTYLE);
+    exStyle &= ~(WS_EX_DLGMODALFRAME | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_WINDOWEDGE | WS_EX_OVERLAPPEDWINDOW);
+    SetWindowLong(target, GWL_EXSTYLE, exStyle);
 
     // Get monitor dimensions
     MONITORINFO mi = {sizeof(mi)};
@@ -75,7 +77,7 @@ void setFullscreenWindowOnly()
                  mi.rcMonitor.top,
                  mi.rcMonitor.right - mi.rcMonitor.left,
                  mi.rcMonitor.bottom - mi.rcMonitor.top,
-                 SWP_NOZORDER | SWP_FRAMECHANGED);
+                 SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
 
     DrawMenuBar(target);
 }
@@ -116,21 +118,70 @@ void getConsoleSize(int &width, int &height)
     height = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
 }
 
+void setFocusModeConsole()
+{
+    HWND hwnd = GetConsoleWindow();
+    Sleep(100); // Give some time for the style to apply
+     HWND target = hwnd;
+    HWND owner = GetWindow(hwnd, GW_OWNER);
+     Sleep(100); // Give some time for the style to apply
+
+    if (owner != nullptr)
+        target = owner;
+    LONG style = GetWindowLong(target, GWL_STYLE);
+    style &= ~(WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+    SetWindowLong(target, GWL_STYLE, style);
+
+    Sleep(100); // Give some time for the style to apply
+    LONG exStyle = GetWindowLong(target, GWL_EXSTYLE);
+    exStyle &= ~(WS_EX_DLGMODALFRAME | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE | WS_EX_WINDOWEDGE | WS_EX_OVERLAPPEDWINDOW);
+    SetWindowLong(target, GWL_EXSTYLE, exStyle);
+    Sleep(100); // Give some time for the style to apply
+
+    SetWindowPos(target, HWND_TOP, 0, 0,
+                 GetSystemMetrics(SM_CXSCREEN),
+                 GetSystemMetrics(SM_CYSCREEN),
+                 SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+    
+    Sleep(100); // Give some time for the style to apply
+    
+    hwnd = GetConsoleWindow();
+   
+    Sleep(100); // Give some time for the style to apply
+
+         target = hwnd;
+     owner = GetWindow(hwnd, GW_OWNER);
+     Sleep(100); // Give some time for the style to apply
+    if (owner != nullptr)
+        target = owner;
+
+    // Apply style changes
+    SetWindowPos(target, HWND_TOP, 0, 0,
+                 GetSystemMetrics(SM_CXSCREEN),
+                 GetSystemMetrics(SM_CYSCREEN),
+                 SWP_NOZORDER | SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+    Sleep(100); // Give some time for the style to apply
+
+    // Remove scroll bars
+    ShowScrollBar(target, SB_BOTH, FALSE);
+    Sleep(100); // Give some time for the style to apply
+
+}
+
 /// TODO: Add the behaviour for sprite animation
-/// TODO: make the collistion system a behavoure and call it in the player movement normally, or even in the physics 
-/// TODO: add the behaviour for physics or maybe not a behavoure since i willl need to call it every certain frames, or maybe a behavoiuor and make it controlled inside the main loop, but this will need to map al the entities that  has attached physics behaviour, depanding in the best practise 
-/// TODO: Add ui system 
+/// TODO: make the collistion system a behavoure and call it in the player movement normally, or even in the physics
+/// TODO: add the behaviour for physics or maybe not a behavoure since i willl need to call it every certain frames, or maybe a behavoiuor and make it controlled inside the main loop, but this will need to map al the entities that  has attached physics behaviour, depanding in the best practise
+/// TODO: Add ui system
 /// TODO: Add multy windows(cmds) system for displaying texts (with wrapping option or maximum characters in one line and these text stuff)
 /// TODO: add the behaviour of platforms
 
-
 int main()
 {
-    Sleep(50);
-
-   
+    Sleep(500);
     //  ==== Console setup ====
     setFullscreenWindowOnly();
+    Sleep(100);
+  //  setFocusModeConsole();
     SetConsoleOutputCP(CP_UTF8);
     enableANSI();
     hideCursor();
@@ -140,7 +191,7 @@ int main()
     int width, height;
     getConsoleSize(width, height);
     fixConsoleBufferSize(width, height);
-    height = height * 2 - 2 ; // Adjust for double-height rendering
+    height = height * 2 - 2; // Adjust for double-height rendering
 
     // ==== Engine + Game World ====
     Engine engine(width, height);
@@ -157,13 +208,12 @@ int main()
     // Load player
     auto playerSprite = Sprite::create("player.png", 5, 5);
 
-    
     // Attach the rotation behavior
     playerSprite->getBehaviorManager().addBehavior(std::make_shared<SpriteRotationBehavior>());
 
     auto player = Entity::create(Vec2{3, 5}, playerSprite);
     // Add a movement script
-    
+
     player->addScript<PlayerMovement>();
     world->addEntity(player);
 
