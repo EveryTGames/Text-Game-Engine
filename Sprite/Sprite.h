@@ -28,7 +28,9 @@ public:
 
     void setPixels(std::vector<std::vector<RGBA>> newPixels)
     {
-        pixels = newPixels;
+        pixels = std::move(newPixels);
+        height = static_cast<int>(pixels.size());
+        width = (height > 0) ? static_cast<int>(pixels[0].size()) : 0;
     }
 
 private:

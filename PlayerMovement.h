@@ -8,11 +8,11 @@
 #include <vector>
 #include <cmath> // for std::round
 #include "../SpriteRotation/SpriteRotationBehavior.h"
+#include "../Sprite/SpriteAnimationBehavior.h"
+#include "../Collision/CollisionSystem.h"
+#include "../Collision/CollisionBehavior.h"
 
-struct CollisionFlag
-{
-    int x, y; // map pixel coordinates where possible collision occurs
-};
+// CollisionFlag moved to Collision/CollisionSystem.h
 
 class PlayerMovement : public Script
 {
@@ -25,9 +25,11 @@ public:
     const Map *map;
     std::shared_ptr<Sprite> sprite;
     std::shared_ptr<SpriteRotationBehavior> rot;
+    std::shared_ptr<SpriteAnimationBehavior> anim;
+    std::shared_ptr<CollisionBehavior> collider;
     float angle;
 
-    std::vector<CollisionFlag> collisionFlags; // store flags across frames
+    // Collision flags are now managed by the attached CollisionBehavior
     void onStart() override
     {
         world = &World::GetInstance();
@@ -51,14 +53,40 @@ public:
             Debug::Log(" PlayerMovement: sprite is null");
             return;
         }
-        
+
         rot = sprite->getBehavior<SpriteRotationBehavior>();
         if (!rot)
         {
             Debug::Log(" PlayerMovement: rotation behavior is null");
         }
-        ///TODO you will make the sprite rotation in a seperated default script that be attached automaticliiy to any sprits created 
+        /// TODO you will make the sprite rotation in a seperated default script that be attached automaticliiy to any sprits created
         rot->setInitialCache(sprite->getPixels());
+
+        // Setup animation behavior (auto-attach if missing)
+        anim = sprite->getBehavior<SpriteAnimationBehavior>();
+        if (!anim)
+        {
+            auto newAnim = std::make_shared<SpriteAnimationBehavior>();
+            sprite->getBehaviorManager().addBehavior<SpriteAnimationBehavior>(newAnim);
+            anim = newAnim;
+        }
+        // Load all frames from sheet tiles of 16x24 pixels:
+        if (anim->addFramesFromSheet("assets/playerAnimation.png", 5, 5))
+        {
+            anim->setFrameDuration(0.3f);
+            anim->setLooping(true);
+            anim->play();
+        }
+
+        // Attach collision behavior to the entity (auto-create if missing)
+        collider = entity->getBehavior<CollisionBehavior>();
+        if (!collider)
+        {
+            auto col = std::make_shared<CollisionBehavior>();
+            entity->getBehaviorManager().addBehavior<CollisionBehavior>(col);
+            collider = col;
+        }
+
         Debug::Log(" PlayerMovement script started");
     }
     inline int roundToInt(float val)
@@ -72,6 +100,9 @@ public:
         world->camera.position = entity->position - Vec2{world->camera.getWidth() / 2, world->camera.getHeight() / 2}; // Center camera on player
                                                                                                                        //  Debug::Log("Camera position: " + std::to_string(world->camera.position.x) + ", " + std::to_string(world->camera.position.y));
                                                                                                                        //   Debug::Log("camera width and height: " + std::to_string(world->camera.getWidth() / 2) + ", " + std::to_string(world->camera.getHeight() / 2));
+        // advance animation each frame
+        if (anim)
+            anim->update(dt);
         Vec2float inputVelocity{0.0f, 0.0f};
 
         if (GetAsyncKeyState('W') & 0x8000)
@@ -87,22 +118,21 @@ public:
 
             rot->rotate(270);
         }
-         if (GetAsyncKeyState('T') & 0x0001)
+        if (GetAsyncKeyState('T') & 0x0001)
         {
 
             rot->rotate(0);
         }
-         if (GetAsyncKeyState('Y') & 0x0001)
-        {   
-            ///TODO
-            //i figured it out
-            // the problem is that when rotating it be rotating the new rotated spirit, so the angle be reset every rotation 
-            // to fix it u can make a variable that hold the main spirit or u can just use the cach variable to store the main spirit when created at index 0 
-            //and instead of sednig the new spirit to the rotating function, we send the cached one at index zero 
+        if (GetAsyncKeyState('Y') & 0x0001)
+        {
+            /// TODO
+            // i figured it out
+            //  the problem is that when rotating it be rotating the new rotated spirit, so the angle be reset every rotation
+            //  to fix it u can make a variable that hold the main spirit or u can just use the cach variable to store the main spirit when created at index 0
+            // and instead of sednig the new spirit to the rotating function, we send the cached one at index zero
 
-            rot->rotate(angle+=22.5);
+            rot->rotate(angle += 22.5);
         }
-
 
         if (inputVelocity.x != 0 && inputVelocity.y != 0)
         {
@@ -115,225 +145,20 @@ public:
         float speed = 1.0f;
         entity->velocity = inputVelocity * speed;
 
+        // Compute desired movement and delegate collision resolution to the collider behavior if present
         Vec2 moveAmount = entity->velocity * std::ceil(dt * 30);
-
-        int steps = static_cast<int>(std::ceil(std::max(std::abs(moveAmount.x), std::abs(moveAmount.y))));
-        if (steps == 0)
-            steps = 1;
-
-        Vec2 stepMove = moveAmount / static_cast<float>(steps);
-
-        for (int i = 0; i < steps; ++i)
+        if (collider)
         {
-            bool movedX = false, movedY = false;
-
-            // Try to move on X axis
-            Vec2 nextPosX = entity->position + Vec2{stepMove.x, 0};
-            std::vector<CollisionFlag> newFlagsX;
-            bool collisionX = isBoxCollidingWithMap(
-                map,
-                roundToInt(nextPosX.x),
-                roundToInt(nextPosX.y),
-                entity->getWidth(),
-                entity->getHeight(),
-                sprite,
-                newFlagsX);
-
-            bool pixelCollisionX = false;
-            std::vector<CollisionFlag> filteredFlagsX;
-
-            if (!collisionX)
-            {
-                for (const CollisionFlag &flag : collisionFlags)
-                {
-                    if (flag.x >= roundToInt(nextPosX.x) &&
-                        flag.x < roundToInt(nextPosX.x) + entity->getWidth() &&
-                        flag.y >= roundToInt(nextPosX.y) &&
-                        flag.y < roundToInt(nextPosX.y) + entity->getHeight())
-                    {
-                        int localX = flag.x - roundToInt(nextPosX.x);
-                        int localY = flag.y - roundToInt(nextPosX.y);
-
-                        if (pixelPerfectCollisionAt(sprite, localX, localY, map, flag.x, flag.y))
-                        {
-                            pixelCollisionX = true;
-                            break;
-                        }
-                        else
-                        {
-                            filteredFlagsX.push_back(flag);
-                        }
-                    }
-                }
-            }
-
-            if (!collisionX && !pixelCollisionX)
-            {
-                entity->position.x = nextPosX.x;
-                collisionFlags = filteredFlagsX;
-                addFlagsNoDuplicates(newFlagsX);
-                movedX = true;
-            }
-
-            // Try to move on Y axis independently (even if X movement blocked)
-            Vec2 nextPosY = entity->position + Vec2{0, stepMove.y};
-            std::vector<CollisionFlag> newFlagsY;
-            bool collisionY = isBoxCollidingWithMap(
-                map,
-                roundToInt(nextPosY.x),
-                roundToInt(nextPosY.y),
-                entity->getWidth(),
-                entity->getHeight(),
-                sprite,
-                newFlagsY);
-
-            bool pixelCollisionY = false;
-            std::vector<CollisionFlag> filteredFlagsY;
-
-            if (!collisionY)
-            {
-                for (const CollisionFlag &flag : collisionFlags)
-                {
-                    if (flag.x >= roundToInt(nextPosY.x) &&
-                        flag.x < roundToInt(nextPosY.x) + entity->getWidth() &&
-                        flag.y >= roundToInt(nextPosY.y) &&
-                        flag.y < roundToInt(nextPosY.y) + entity->getHeight())
-                    {
-                        int localX = flag.x - roundToInt(nextPosY.x);
-                        int localY = flag.y - roundToInt(nextPosY.y);
-
-                        if (pixelPerfectCollisionAt(sprite, localX, localY, map, flag.x, flag.y))
-                        {
-                            pixelCollisionY = true;
-                            break;
-                        }
-                        else
-                        {
-                            filteredFlagsY.push_back(flag);
-                        }
-                    }
-                }
-            }
-
-            if (!collisionY && !pixelCollisionY)
-            {
-                entity->position.y = nextPosY.y;
-                collisionFlags = filteredFlagsY;
-                addFlagsNoDuplicates(newFlagsY);
-                movedY = true;
-            }
-
-            // If both blocked, stop further movement steps
-            if (!movedX && !movedY)
-            {
-                break;
-            }
+            entity->position = collider->moveWithCollision(entity->position, moveAmount, map, sprite);
         }
-
-        // debug the count of the flags
-        // Debug::Log("Collision flags count: " + std::to_string(collisionFlags.size()));
-
-        // Cleanup flags outside bounding box
-        collisionFlags.erase(
-            std::remove_if(
-                collisionFlags.begin(),
-                collisionFlags.end(),
-                [&](const CollisionFlag &flag)
-                {
-                    return flag.x < roundToInt(entity->position.x) ||
-                           flag.x >= roundToInt(entity->position.x) + entity->getWidth() ||
-                           flag.y < roundToInt(entity->position.y) ||
-                           flag.y >= roundToInt(entity->position.y) + entity->getHeight();
-                }),
-            collisionFlags.end());
+        else
+        {
+            // fallback: direct move (no collision)
+            entity->position += moveAmount;
+        }
 
         //  Debug::Log("Player position: " + std::to_string(entity->position.x) + ", " + std::to_string(entity->position.y));
     }
 
-    // Check if a pixel at (localX, localY) in the sprite collides with a solid map pixel at (mapX, mapY)
-    bool pixelPerfectCollisionAt(
-        std::shared_ptr<Sprite> sprite,
-        int localX, int localY,
-        const Map *map,
-        int mapX, int mapY)
-    {
-        // Check sprite pixel solidity
-        if (sprite->isSolid(localX, localY) == 0)
-            return false;
-
-        // Check map pixel solidity
-        if (!map->isSolid(mapX, mapY))
-            return false;
-
-        return true; // collision detected
-    }
-
-    bool isBoxCollidingWithMap(
-        const Map *map,
-        int x, int y,
-        int width, int height,
-        std::shared_ptr<Sprite> sprite,
-        std::vector<CollisionFlag> &outFlags)
-    {
-        bool collisionFound = false;
-        outFlags.clear();
-
-        // Check only the boundary pixels of the bounding box
-        for (int px = x; px < x + width; px++)
-        {
-            for (int py = y; py < y + height; py++)
-            {
-                // Skip pixels inside the boundary (check only top, bottom, left, right edges)
-                bool onLeftEdge = (px == x);
-                bool onRightEdge = (px == x + width - 1);
-                bool onTopEdge = (py == y);
-                bool onBottomEdge = (py == y + height - 1);
-
-                if (!(onLeftEdge || onRightEdge || onTopEdge || onBottomEdge))
-                    continue;
-
-                // Check if map pixel solid
-                if (map->isSolid(px, py))
-                {
-                    // Translate map pixel to sprite local coordinates
-                    int localX = px - x;
-                    int localY = py - y;
-
-                    // Check sprite pixel alpha
-                    if (sprite->isSolid(localX, localY) > 0)
-                    {
-                        // Solid pixel collision: immediate collision
-                        collisionFound = true;
-                        // Optionally break here to optimize, or continue to collect flags
-                    }
-                    else
-                    {
-                        // Sprite pixel transparent but map solid: possible near-collision
-                        outFlags.push_back({px, py});
-                    }
-                }
-            }
-        }
-
-        return collisionFound;
-    }
-
-private:
-    void addFlagsNoDuplicates(const std::vector<CollisionFlag> &newFlags)
-    {
-        for (const CollisionFlag &flag : newFlags)
-        {
-            bool found = false;
-            for (const CollisionFlag &existingFlag : collisionFlags)
-            {
-                if (existingFlag.x == flag.x && existingFlag.y == flag.y)
-                {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-                collisionFlags.push_back(flag);
-        }
-    }
+    // Collision is handled by the attached CollisionBehavior.
 };

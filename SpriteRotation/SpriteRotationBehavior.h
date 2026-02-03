@@ -12,6 +12,8 @@ private:
     std::unordered_map<int, std::vector<std::vector<RGBA>>> rotationCache;
 
 public:
+// IBehavior<Sprite> implementation
+//this can only be attached to spirites
     void attach(std::shared_ptr<Sprite> s) override
     {
         sprite = s;

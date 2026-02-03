@@ -168,9 +168,9 @@ void setFocusModeConsole()
 
 }
 
-/// TODO: Add the behaviour for sprite animation
-/// TODO: make the collistion system a behavoure and call it in the player movement normally, or even in the physics
-/// TODO: add the behaviour for physics or maybe not a behavoure since i willl need to call it every certain frames, or maybe a behavoiuor and make it controlled inside the main loop, but this will need to map al the entities that  has attached physics behaviour, depanding in the best practise
+/// TODO: Add the behaviour for sprite animation (done)
+/// TODO: make the collistion system a behavoure and call it in the player movement normally, or even in the physics (done)
+/// TODO: add the behaviour for physics or maybe not a behavoure since i willl need to call it every certain frames, or maybe a behavoiuor and make it controlled inside the main loop, but this will need to map al the entities that  has attached physics behaviour, depanding in the best practise 
 /// TODO: Add ui system
 /// TODO: Add multy windows(cmds) system for displaying texts (with wrapping option or maximum characters in one line and these text stuff)
 /// TODO: add the behaviour of platforms
@@ -206,7 +206,7 @@ int main()
     world->camera.setSize(width, height);
 
     // Load player
-    auto playerSprite = Sprite::create("player.png", 5, 5);
+    auto playerSprite = Sprite::create("assets/player.png", 5, 5);
 
     // Attach the rotation behavior
     playerSprite->getBehaviorManager().addBehavior(std::make_shared<SpriteRotationBehavior>());
